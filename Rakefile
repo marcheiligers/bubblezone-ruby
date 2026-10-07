@@ -2,6 +2,7 @@
 
 require "bundler/gem_tasks"
 require "minitest/test_task"
+require "rubygems/package"
 
 Minitest::TestTask.create
 
@@ -64,6 +65,11 @@ begin
     "#{goos}_#{arch}"
   end
 
+  def shared_library_path
+    extension = RbConfig::CONFIG["host_os"].match?(/darwin/) ? "dylib" : "so"
+    "go/build/#{detect_go_platform}/libbubblezone.#{extension}"
+  end
+
   namespace :go do
     desc "Build Go archive for current platform"
     task :build do
@@ -71,6 +77,13 @@ begin
       output_dir = "go/build/#{platform}"
       FileUtils.mkdir_p(output_dir)
       sh "cd go && CGO_ENABLED=1 go build -buildmode=c-archive -o build/#{platform}/libbubblezone.a ."
+    end
+
+    desc "Build Go shared library for current platform"
+    task :build_shared do
+      output_dir = File.dirname(shared_library_path)
+      FileUtils.mkdir_p(output_dir)
+      sh "cd go && CGO_ENABLED=1 go build -buildmode=c-shared -o ../#{shared_library_path} ."
     end
 
     desc "Build Go archives for all platforms"
@@ -143,6 +156,22 @@ begin
       end
     end
   end
+
+  java_gemspec = Gem::Specification.load("bubblezone.gemspec").dup
+  java_gemspec.platform = Gem::Platform.new("java")
+  java_gemspec.extensions = []
+  java_gemspec.files = java_gemspec.files.reject do |file|
+    file.start_with?("ext/", "go/")
+  end
+  java_gemspec.files << shared_library_path
+  java_gemspec.add_dependency "ffi", "~> 1.17"
+
+  desc "Build the Java gem with the current host shared library"
+  task "gem:java" => "go:build_shared" do
+    FileUtils.mkdir_p("pkg")
+    gem_file = Gem::Package.build(java_gemspec)
+    FileUtils.mv(gem_file, File.join("pkg", gem_file), force: true)
+  end
 rescue LoadError => e
   desc "Compile task not available (rake-compiler not installed)"
   task :compile do
@@ -161,4 +190,6 @@ rescue LoadError => e
   end
 end
 
-task default: [:test, :compile]
+default_tasks = [:test]
+default_tasks << :compile unless RUBY_ENGINE == "jruby"
+task default: default_tasks

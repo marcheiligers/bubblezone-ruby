@@ -1,7 +1,13 @@
 # frozen_string_literal: true
 
 require_relative "bubblezone/version"
-require_relative "bubblezone/bubblezone"
+
+if RUBY_ENGINE == "jruby"
+  require_relative "bubblezone/jruby"
+else
+  require_relative "bubblezone/bubblezone"
+end
+
 require_relative "bubblezone/manager"
 require_relative "bubblezone/zone_info"
 

@@ -33,5 +33,5 @@ Gem::Specification.new do |spec|
   spec.executables = spec.files.grep(%r{\Aexe/}) { |f| File.basename(f) }
   spec.require_paths = ["lib"]
 
-  spec.extensions = ["ext/bubblezone/extconf.rb"]
+  spec.extensions = ["ext/bubblezone/extconf.rb"] unless RUBY_ENGINE == "jruby"
 end
